@@ -48,8 +48,21 @@ Begge malene må endres, ikke bare Magic Link: `signInWithOtp` står med
 Rate limit for e-post er hevet til 100/time (prosjektomfattende). De øvrige grensene er
 per IP-adresse og trenger ikke endring for 11 personer.
 
-**Merk:** `shouldCreateUser: true` betyr at hvem som helst med lenken kan logge inn og
-svare — det finnes ingen sperre mot andre enn de 11. Bevisst valgt, ikke en forglemmelse.
+## Åpen dør, med en planlagt lås
+
+`shouldCreateUser: true` betyr at hvem som helst med lenken kan logge inn og svare — det
+finnes ingen sperre mot andre enn de 11. Bevisst valgt, ikke en forglemmelse: eieren har
+ikke alle e-postadressene på forhånd, og folk som taster feil adresse skal kunne rette det
+selv uten å måtte mase på ham.
+
+**Når alle 11 har logget inn, skal døra låses** — i Supabase, ikke i koden:
+`Authentication → Sign In / Providers → Email → "Allow new users to sign up" = av`.
+Eksisterende brukere kommer fortsatt inn, nye avvises. Kan skrus på igjen når som helst.
+Lås ikke før alle er inne, ellers må eieren slippe folk inn manuelt.
+
+Ikke løs dette med en liste over tillatte adresser i `index.html`. Sperren ville da ligget
+hos den som skal stoppes, og du ville publisert 11 privatpersoners e-postadresser i et
+offentlig repo.
 
 ## Hvis magic link skal vurderes (åpent spørsmål fra eieren)
 
