@@ -48,11 +48,12 @@
   .hint{color:var(--muted);font-size:13px;margin:0 0 8px}
 
   label.fld{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
-  input[type=text]{
+  input[type=text],input[type=email]{
     width:100%;padding:12px 14px;border:1px solid var(--line-strong);border-radius:10px;
     font-size:16px;background:#fbfcfb;color:var(--ink)
   }
-  input[type=text]:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 3px rgba(15,71,60,.15)}
+  input[type=text]:focus,input[type=email]:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 3px rgba(15,71,60,.15)}
+  input#code{letter-spacing:.35em;font-size:22px;text-align:center;font-weight:700}
 
   .seg{display:flex;gap:8px;margin-top:8px}
   .seg button{flex:1;padding:11px 8px;border:1px solid var(--line-strong);background:#fbfcfb;border-radius:10px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
@@ -86,9 +87,10 @@
   .subnote{color:var(--muted);font-size:12.5px;margin:2px 0 4px}
   .optrow{display:flex;gap:8px;align-items:stretch}
   .optrow .opt{flex:1}
-  .delbtn{flex:none;width:44px;border:1px solid var(--line-strong);background:#fff;border-radius:11px;color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
-  .delbtn:hover{border-color:#c98b7f;color:#8a2b1e;background:#fdf4f2}
-  .delbtn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(138,43,30,.18)}
+  .delbtn{flex:none;width:44px;border:1px solid #e0aaa0;background:#fdf4f2;border-radius:11px;color:#c0301c;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .delbtn svg{width:20px;height:20px;display:block}
+  .delbtn:hover{border-color:#c0301c;background:#fbe7e3}
+  .delbtn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(192,48,28,.22)}
 
   .barbtn{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(233,239,235,0),var(--bg) 40%);padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
   .barbtn .inner{max-width:660px;margin:0 auto;display:flex;gap:10px}
@@ -107,6 +109,10 @@
   .tabs button.active{background:var(--pine);border-color:var(--pine);color:#fff}
 
   .err{color:#8a2b1e;font-size:14px;margin:10px 30px 0;font-weight:600}
+  .ok{color:#1d6b45;font-size:14px;margin:10px 0 0;font-weight:600}
+  .whoami{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+  .whoami b{color:var(--ink);font-weight:600;word-break:break-all}
+  .boot{text-align:center;color:var(--muted);padding:60px 10px}
 
   /* Done */
   .done{text-align:center;padding:34px 16px}
@@ -165,16 +171,49 @@
 </header>
 
 <div class="wrap">
+  <!-- BOOTING -->
+  <section id="v-boot" class="view">
+    <div class="boot">Loading…</div>
+  </section>
+
+  <!-- SIGN IN -->
+  <section id="v-auth" class="view" hidden>
+    <p class="lead">Sign in first, so your answer belongs to you. Then only you can change or delete it. No password needed.</p>
+    <div class="card">
+      <div id="authStep1">
+        <label class="fld" for="email">Your email</label>
+        <p class="hint">We will send you a 6-digit code.</p>
+        <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div id="authStep2" hidden>
+        <label class="fld" for="code">Your code</label>
+        <p class="hint">We sent a 6-digit code to <b id="sentTo"></b>. If it does not turn up, check your spam folder.</p>
+        <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+        <div class="minor" style="margin-top:14px">
+          <button class="link" id="resendCode">Send a new code</button>
+          &nbsp;·&nbsp;
+          <button class="link" id="changeEmail">Use a different email</button>
+        </div>
+      </div>
+      <div id="authErr" class="err" style="margin-left:0;display:none"></div>
+      <div id="authOk" class="ok" style="display:none"></div>
+    </div>
+    <button class="btn btn-primary block" id="authBtn">Send me a code</button>
+  </section>
+
   <!-- LANDING -->
-  <section id="v-landing" class="view">
+  <section id="v-landing" class="view" hidden>
     <p class="lead">Answer seven quick questions so we can build a plan that fits everyone. It takes about two minutes.</p>
     <div class="card">
       <label class="fld" for="name">Your name</label>
       <p class="hint">Answering just for yourself? Use your own name. Answering for your whole family? Use your family name.</p>
       <input id="name" type="text" autocomplete="off" placeholder="e.g. Amina, or the Hodžić family">
       <div id="landErr" class="err" style="margin-left:0;display:none"></div>
+      <div class="whoami">
+        <span>Signed in as <b id="whoLanding"></b></span>
+        <button class="link" id="signOutLanding">Sign out</button>
+      </div>
     </div>
-    <div id="landBanner"></div>
     <button class="btn btn-primary block" id="startBtn">Start</button>
     <button class="btn btn-accent block" id="goResultsFromLand">View results</button>
   </section>
@@ -192,7 +231,7 @@
     <div class="card done">
       <div class="check">✓</div>
       <h2 class="serif" style="margin:0 0 4px">Answer saved</h2>
-      <p style="color:var(--muted);margin:0 0 18px">Thanks. You can change your answers any time from this device.</p>
+      <p style="color:var(--muted);margin:0 0 18px">Thanks. You can change or delete your answer any time, from any device — just sign in with the same email.</p>
       <div class="tabs" style="margin-top:0">
         <button class="active" id="doneResults">See results</button>
         <button id="doneEdit">Edit my answers</button>
@@ -210,16 +249,19 @@
       <div class="rsum" id="rsum"></div>
       <div id="rbody"></div>
       <div class="minor">
-        <button class="link" id="clearMine">Clear my answer</button>
+        <button class="link" id="clearMine">Delete my answer and start over</button>
+      </div>
+      <div class="whoami">
+        <span>Signed in as <b id="whoResults"></b></span>
+        <button class="link" id="signOutResults">Sign out</button>
       </div>
     </div>
     <button class="btn btn-primary block" id="editMine">Edit my answer</button>
-    <button class="btn btn-accent block" id="newAnswer">New answer</button>
   </section>
 </div>
 
-<!-- STICKY BUTTON (form + landing) -->
-<div class="barbtn" id="bar">
+<!-- STICKY BUTTON (form) -->
+<div class="barbtn" id="bar" style="display:none">
   <div class="inner">
     <button class="btn btn-ghost" id="barBack">Back</button>
     <button class="btn btn-primary" id="barMain">Save my answers</button>
@@ -229,7 +271,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ---------- data ---------- */
-const single=(id,title,help,options)=>({id,type:'single',title,help,options});
+const TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const single=(id,title,help,options)=>({id,type:'single',title,help,options,custom:true});
 const QS=[
   single('q1','Plan for the week','Do most things together, or a flexible mix.',['Together (all 11)','Flexible (sometimes together, sometimes separate)']),
   {id:'q2',type:'ranked',max:5,custom:true,title:'Your top interests',help:'Pick up to 5, in order of preference.',options:[
@@ -253,52 +296,171 @@ const QS=[
 ];
 
 /* ---------- storage (Supabase) ----------
-   Paste your two Supabase values below (Project Settings > API).
-   Until you do, answers stay only on this screen (in-memory),
-   which is fine for testing the app. */
+   The anon key below is meant to be public. What protects the data is
+   row-level security in the database: everyone signed in may READ every
+   answer, but may only INSERT / UPDATE / DELETE their own row. */
 const SUPABASE_URL='https://iqffgffgqgtwltdvvlfv.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZmZnZmZncWd0d2x0ZHZ2bGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODI2NDQsImV4cCI6MjA5OTk1ODY0NH0.AOyTSmQdBd8mp9sNuEpBZtcJUYP27HPlR1IRR8hV5wo';
 const TABLE='sarajevo_survey_responses';
-const sb=(window.supabase && /^https?:\/\//.test(SUPABASE_URL))
-  ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;
-const hasStore=!!sb;
-const mem={};
-async function saveResponse(rec){
-  if(sb){ const {error}=await sb.from(TABLE).upsert({id:rec.id,data:rec}); if(error) throw error; return; }
-  mem[rec.id]=rec;
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}
+});
+
+async function saveResponse(){
+  const {error}=await sb.from(TABLE).upsert(
+    {user_id:state.user.id,name:state.name,answers:state.answers},
+    {onConflict:'user_id'}
+  );
+  if(error) throw error;
+}
+async function loadMine(){
+  const {data,error}=await sb.from(TABLE).select('name,answers').eq('user_id',state.user.id).maybeSingle();
+  if(error) throw error;
+  return data;
 }
 async function loadAll(){
-  if(sb){ const {data,error}=await sb.from(TABLE).select('data').order('created_at',{ascending:true}); if(error) throw error; return (data||[]).map(r=>r.data); }
-  return Object.values(mem);
+  const {data,error}=await sb.from(TABLE).select('user_id,name,answers,created_at').order('created_at',{ascending:true});
+  if(error) throw error;
+  return data||[];
 }
-async function deleteResponse(id){
-  if(sb){ const {error}=await sb.from(TABLE).delete().eq('id',id); if(error) throw error; return; }
-  delete mem[id];
+async function deleteMine(){
+  const {error}=await sb.from(TABLE).delete().eq('user_id',state.user.id);
+  if(error) throw error;
 }
 
 /* ---------- state ---------- */
-const state={ name:'', answers:{}, custom:{}, myId:null };
-QS.forEach(q=>{ state.answers[q.id] = (q.type==='ranked')? [] : null; if(q.custom) state.custom[q.id]=[]; });
+const state={ user:null, name:'', answers:{}, custom:{}, hasSaved:false, pendingEmail:'' };
+function blankAnswers(){
+  QS.forEach(q=>{ state.answers[q.id] = (q.type==='ranked')? [] : null; if(q.custom) state.custom[q.id]=[]; });
+}
+blankAnswers();
+
+/* Options other people added, gathered from the saved answers in the database. */
+const shared={};
+QS.forEach(q=>{ shared[q.id]=[]; });
+function collectShared(list){
+  QS.forEach(q=>{
+    const found=[];
+    (list||[]).forEach(r=>{
+      const a = (r && r.answers) ? r.answers[q.id] : null;
+      const vals = Array.isArray(a) ? a : (a ? [a] : []);
+      vals.forEach(v=>{
+        if(typeof v==='string' && !q.options.includes(v) && !found.includes(v)) found.push(v);
+      });
+    });
+    shared[q.id]=found;
+  });
+}
 
 const $=s=>document.querySelector(s);
-const views={landing:$('#v-landing'),form:$('#v-form'),done:$('#v-done'),results:$('#v-results')};
-let current='landing';
+const views={boot:$('#v-boot'),auth:$('#v-auth'),landing:$('#v-landing'),form:$('#v-form'),done:$('#v-done'),results:$('#v-results')};
+let current='boot';
 
 function show(v){
   current=v;
   Object.entries(views).forEach(([k,el])=>{el.hidden=(k!==v)});
   $('#bar').style.display=(v==='form')?'block':'none';
   if(v==='results') renderResults();
+  if(v==='landing'||v==='results') paintWhoAmI();
   window.scrollTo({top:0,behavior:'auto'});
 }
+function paintWhoAmI(){
+  const e=state.user?state.user.email:'';
+  $('#whoLanding').textContent=e;
+  $('#whoResults').textContent=e;
+}
 
-/* ---------- landing ---------- */
-if(!hasStore){
-  $('#landBanner').innerHTML='<div class="banner">Shared saving turns on once your Supabase keys are added and the app is hosted. Right now answers stay only on this screen.</div>';
+/* ---------- sign in ---------- */
+function authError(m){ const e=$('#authErr'); e.textContent=m; e.style.display='block'; $('#authOk').style.display='none'; }
+function authOk(m){ const e=$('#authOk'); e.textContent=m; e.style.display='block'; $('#authErr').style.display='none'; }
+function clearAuthMsg(){ $('#authErr').style.display='none'; $('#authOk').style.display='none'; }
+
+function authStep(n){
+  $('#authStep1').hidden=(n!==1);
+  $('#authStep2').hidden=(n!==2);
+  $('#authBtn').textContent=(n===1)?'Send me a code':'Sign in';
+  clearAuthMsg();
+  if(n===2){ $('#sentTo').textContent=state.pendingEmail; $('#code').value=''; $('#code').focus(); }
+}
+
+async function sendCode(){
+  const email=$('#email').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ authError('Please type a valid email address.'); return; }
+  const btn=$('#authBtn'); btn.disabled=true; btn.textContent='Sending…';
+  const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  btn.disabled=false;
+  if(error){ btn.textContent='Send me a code'; authError(error.message||'Could not send the code. Please try again.'); return; }
+  state.pendingEmail=email;
+  authStep(2);
+}
+
+async function verifyCode(){
+  const token=$('#code').value.trim();
+  if(!/^\d{6}$/.test(token)){ authError('The code is 6 digits.'); return; }
+  const btn=$('#authBtn'); btn.disabled=true; btn.textContent='Checking…';
+  const {data,error}=await sb.auth.verifyOtp({email:state.pendingEmail,token,type:'email'});
+  btn.disabled=false; btn.textContent='Sign in';
+  if(error||!data||!data.session){
+    authError((error&&error.message)||'That code did not work. Check it, or ask for a new one.');
+    return;
+  }
+  await onSignedIn(data.session.user);
+}
+
+async function resend(){
+  const btn=$('#resendCode'); btn.disabled=true;
+  const {error}=await sb.auth.signInWithOtp({email:state.pendingEmail,options:{shouldCreateUser:true}});
+  btn.disabled=false;
+  if(error) authError(error.message||'Could not send a new code.');
+  else authOk('A new code is on its way.');
+}
+
+async function signOut(){
+  await sb.auth.signOut();
+  state.user=null; state.name=''; state.hasSaved=false; state.pendingEmail='';
+  blankAnswers();
+  $('#name').value=''; $('#email').value='';
+  authStep(1);
+  show('auth');
+}
+
+/* Load whatever this person saved before, so they edit instead of starting blank. */
+async function onSignedIn(user){
+  state.user=user;
+  let mine=null;
+  try{ mine=await loadMine(); }
+  catch(e){ /* fall through to a blank form rather than blocking sign-in */ }
+  if(mine){
+    state.hasSaved=true;
+    state.name=mine.name||'';
+    $('#name').value=state.name;
+    QS.forEach(q=>{
+      const v=mine.answers?mine.answers[q.id]:null;
+      if(q.type==='ranked') state.answers[q.id]=Array.isArray(v)?v.slice():[];
+      else state.answers[q.id]=(typeof v==='string'&&v)?v:null;
+      /* Anything I picked that is not a built-in option was added by me. */
+      if(q.custom){
+        const picked=(q.type==='ranked')?(state.answers[q.id]||[]):(state.answers[q.id]?[state.answers[q.id]]:[]);
+        state.custom[q.id]=picked.filter(o=>!q.options.includes(o));
+      }
+    });
+    show('results');
+  }else{
+    state.hasSaved=false;
+    show('landing');
+  }
 }
 
 /* ---------- form render ---------- */
-function allOptions(q){ return q.options.concat(state.custom[q.id]||[]); }
+function allOptions(q){
+  const out=q.options.slice();
+  (shared[q.id]||[]).forEach(o=>{ if(!out.includes(o)) out.push(o); });
+  (state.custom[q.id]||[]).forEach(o=>{ if(!out.includes(o)) out.push(o); });
+  return out;
+}
+/* An option counts as "mine" (deletable) only if I added it myself. */
+function isMine(q,opt){ return (state.custom[q.id]||[]).includes(opt); }
+function isExtra(q,opt){ return !q.options.includes(opt); }
 
 function renderForm(){
   const wrap=$('#formQuestions'); wrap.innerHTML='';
@@ -312,7 +474,8 @@ function renderForm(){
     div.appendChild(opts);
     if(q.custom){
       const adder=document.createElement('div'); adder.className='adder';
-      adder.innerHTML=`<input type="text" id="add-${q.id}" maxlength="60" autocomplete="off" placeholder="Add your own interest"><button type="button" class="addbtn" data-q="${q.id}">Add</button>`;
+      const ph = (q.type==='ranked') ? 'Add your own interest' : 'Add your own answer';
+      adder.innerHTML=`<input type="text" id="add-${q.id}" maxlength="60" autocomplete="off" placeholder="${ph}"><button type="button" class="addbtn" data-q="${q.id}">Add</button>`;
       div.appendChild(adder);
     }
     wrap.appendChild(div);
@@ -332,16 +495,19 @@ function renderOpts(q){
   const arr=state.answers[q.id];
   let html='';
   allOptions(q).forEach(opt=>{
+    const mine=isMine(q,opt), extra=isExtra(q,opt);
+    const note = mine ? ' <em class="cust">(yours)</em>' : (extra ? ' <em class="cust">(added)</em>' : '');
+    let btn;
     if(q.type==='single'){
       const on=arr===opt;
-      html+=`<button type="button" class="opt" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="tick"></span><span>${escapeHtml(opt)}</span></button>`;
+      btn=`<button type="button" class="opt" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="tick"></span><span>${escapeHtml(opt)}${note}</span></button>`;
     }else{
-      const rank=arr.indexOf(opt), on=rank>-1, custom=(state.custom[q.id]||[]).includes(opt);
-      const btn=`<button type="button" class="opt ranked" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="badge">${on?rank+1:''}</span><span>${escapeHtml(opt)}${custom?' <em class="cust">(yours)</em>':''}</span></button>`;
-      html+= custom
-        ? `<div class="optrow">${btn}<button type="button" class="delbtn" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-label="Delete this interest" title="Delete">🗑️</button></div>`
-        : btn;
+      const rank=arr.indexOf(opt), on=rank>-1;
+      btn=`<button type="button" class="opt ranked" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="badge">${on?rank+1:''}</span><span>${escapeHtml(opt)}${note}</span></button>`;
     }
+    html+= mine
+      ? `<div class="optrow">${btn}<button type="button" class="delbtn" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-label="Delete this option" title="Delete">${TRASH}</button></div>`
+      : btn;
   });
   cont.innerHTML=html;
   cont.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',onOpt));
@@ -372,16 +538,26 @@ function onOpt(e){
 
 function addCustom(q,value){
   value=(value||'').trim(); if(!value) return;
-  const dup=allOptions(q).some(o=>o.toLowerCase()===value.toLowerCase());
-  if(!dup)(state.custom[q.id]=state.custom[q.id]||[]).push(value);
-  const arr=state.answers[q.id];
-  if(!arr.includes(value)&&arr.length<q.max) arr.push(value);
+  /* If the same text already exists (mine or someone else's), just pick that one. */
+  const existing=allOptions(q).find(o=>o.toLowerCase()===value.toLowerCase());
+  if(existing) value=existing;
+  else (state.custom[q.id]=state.custom[q.id]||[]).push(value);
+  if(q.type==='single'){
+    state.answers[q.id]=value;
+  }else{
+    const arr=state.answers[q.id];
+    if(!arr.includes(value)&&arr.length<q.max) arr.push(value);
+  }
   renderOpts(q);
   $('#formErr').style.display='none';
 }
 function deleteCustom(q,opt){
   const cl=state.custom[q.id]||[]; const i=cl.indexOf(opt); if(i>-1) cl.splice(i,1);
-  const arr=state.answers[q.id]; const j=arr.indexOf(opt); if(j>-1) arr.splice(j,1);
+  if(q.type==='single'){
+    if(state.answers[q.id]===opt) state.answers[q.id]=null;
+  }else{
+    const arr=state.answers[q.id]; const j=arr.indexOf(opt); if(j>-1) arr.splice(j,1);
+  }
   renderOpts(q);
 }
 
@@ -402,11 +578,10 @@ async function submit(){
     return;
   }
   const main=$('#barMain'); main.disabled=true; main.textContent='Saving...';
-  if(!state.myId) state.myId='resp_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-  const rec={id:state.myId,name:state.name,answers:state.answers,ts:Date.now()};
-  try{ await saveResponse(rec); }
+  try{ await saveResponse(); }
   catch(e){ main.disabled=false; main.textContent='Save my answers'; alert('Could not save right now. Check your connection and try again.'); return; }
   main.disabled=false; main.textContent='Save my answers';
+  state.hasSaved=true;
   show('done');
 }
 
@@ -415,8 +590,13 @@ let cache=[];
 async function loadResponses(){
   let out=[];
   try{ out=await loadAll(); }catch(e){ out=[]; }
-  out=out.filter(Boolean);
-  out.sort((a,b)=>(a.ts||0)-(b.ts||0)); cache=out;
+  cache=out.filter(Boolean);
+  collectShared(cache);
+}
+/* Fetch everyone's answers first, so options other people added show up in the form. */
+async function prepareForm(){
+  await loadResponses();
+  renderForm();
 }
 async function renderResults(){
   $('#rbody').innerHTML='<div class="empty">Loading…</div>';
@@ -432,7 +612,7 @@ function paint(){
   let html='';
   QS.forEach((q,i)=>{
     if(q.type==='ranked'){
-      const counts={},score={},places={},order=[];
+      const counts=Object.create(null),score=Object.create(null),places=Object.create(null),order=[];
       data.forEach(r=>{ (r.answers[q.id]||[]).forEach((opt,idx)=>{
         if(!(opt in counts)){counts[opt]=0;score[opt]=0;places[opt]=[0,0,0,0,0];order.push(opt);}
         counts[opt]++; score[opt]+=(q.max-idx); if(idx<5) places[opt][idx]++;
@@ -456,21 +636,30 @@ function paint(){
       html+='</div>';
       return;
     }
-    const tally={}; q.options.forEach(o=>tally[o]=0);
-    data.forEach(r=>{ const a=r.answers[q.id]; if(a && a in tally) tally[a]++; });
+    const tally=Object.create(null); q.options.forEach(o=>tally[o]=0);
+    const extras=[];
+    data.forEach(r=>{
+      const a=r.answers[q.id]; if(typeof a!=='string' || !a) return;
+      if(!(a in tally)){ tally[a]=0; extras.push(a); }
+      tally[a]++;
+    });
+    /* Options people added themselves go last, most picked first. */
+    extras.sort((a,b)=>tally[b]-tally[a]);
+    const rows=q.options.concat(extras);
     const base=data.filter(r=>r.answers[q.id]).length;
-    const max=Math.max(1,...Object.values(tally));
     html+=`<div class="rq"><h3><span class="rn">${i+1}</span>${q.title}</h3>`;
-    q.options.forEach(o=>{
+    rows.forEach(o=>{
       const c=tally[o]; const pct=base?Math.round(c/base*100):0; const w=pct;
-      html+=`<div class="row"><div class="rl"><span>${escapeHtml(o)}</span><span>${c}${base?` · ${pct}%`:''}</span></div>`+
+      const isCustom=!q.options.includes(o);
+      html+=`<div class="row"><div class="rl"><span>${escapeHtml(o)}${isCustom?' <em class="cust">(added)</em>':''}</span><span>${c}${base?` · ${pct}%`:''}</span></div>`+
             `<div class="track"><div class="fill ${pctClass(pct)}" data-w="${w}"></div></div></div>`;
     });
     html+='</div>';
   });
   // respondents
+  const meId=state.user?state.user.id:null;
   html+=`<div class="rq"><h3>Who has answered</h3><div class="names">`+
-        data.map(r=>`<b>${escapeHtml(r.name||'Someone')}</b>`).join(' &nbsp; ')+
+        data.map(r=>`<b>${escapeHtml(r.name||'Someone')}</b>${r.user_id===meId?'<span class="tag">you</span>':''}`).join(' &nbsp; ')+
         `</div></div>`;
   body.innerHTML=html;
   requestAnimationFrame(()=>body.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w+'%'));
@@ -478,34 +667,58 @@ function paint(){
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function pctClass(p){ if(p>=75) return 'g'; if(p>=25) return 'o'; if(p>=1) return 'r'; return ''; }
 function resetAnswer(){
-  state.name=''; state.myId=null;
-  QS.forEach(q=>{ state.answers[q.id]=(q.type==='ranked')?[]:null; if(q.custom) state.custom[q.id]=[]; });
+  state.name=''; state.hasSaved=false;
+  blankAnswers();
   const n=$('#name'); if(n) n.value='';
 }
 
 /* ---------- wiring ---------- */
-$('#startBtn').addEventListener('click',()=>{
+$('#authBtn').addEventListener('click',()=>{ $('#authStep2').hidden?sendCode():verifyCode(); });
+$('#email').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();sendCode();} });
+$('#email').addEventListener('input',clearAuthMsg);
+$('#code').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();verifyCode();} });
+$('#code').addEventListener('input',clearAuthMsg);
+$('#changeEmail').addEventListener('click',()=>authStep(1));
+$('#resendCode').addEventListener('click',resend);
+$('#signOutLanding').addEventListener('click',signOut);
+$('#signOutResults').addEventListener('click',signOut);
+
+$('#startBtn').addEventListener('click',async()=>{
   const err=$('#landErr');
   if(!state.name.trim()){ err.style.display='block'; err.textContent='Please add your name first.'; return; }
-  err.style.display='none'; renderForm(); show('form');
+  err.style.display='none';
+  const b=$('#startBtn'); b.disabled=true; b.textContent='Loading…';
+  await prepareForm();
+  b.disabled=false; b.textContent='Start';
+  show('form');
 });
 $('#barMain').addEventListener('click',submit);
-$('#barBack').addEventListener('click',()=>show('landing'));
+$('#barBack').addEventListener('click',()=>show(state.hasSaved?'results':'landing'));
 $('#name').addEventListener('input',e=>{ state.name=e.target.value; $('#landErr').style.display='none'; });
 $('#goResultsFromLand').addEventListener('click',()=>show('results'));
 $('#doneResults').addEventListener('click',()=>show('results'));
-$('#doneEdit').addEventListener('click',()=>{ renderForm(); show('form'); });
+$('#doneEdit').addEventListener('click',async()=>{ await prepareForm(); show('form'); });
 $('#refresh').addEventListener('click',renderResults);
-$('#editMine').addEventListener('click',()=>{ renderForm(); show(state.name?'form':'landing'); });
-$('#newAnswer').addEventListener('click',()=>{ resetAnswer(); show('landing'); });
+$('#editMine').addEventListener('click',async()=>{
+  if(!state.name.trim()){ show('landing'); return; }
+  await prepareForm(); show('form');
+});
 $('#clearMine').addEventListener('click',async()=>{
-  if(!state.myId){ alert('There is no saved answer to clear on this device yet.'); return; }
-  if(!confirm('Delete your saved answer? This cannot be undone.')) return;
-  try{ await deleteResponse(state.myId); }
+  if(!state.hasSaved){ alert('You have not saved an answer yet.'); return; }
+  if(!confirm('Delete your answer? This cannot be undone, but you can fill it in again.')) return;
+  try{ await deleteMine(); }
   catch(e){ alert('Could not delete right now. Try again.'); return; }
   resetAnswer();
-  renderResults();
+  show('landing');
 });
 
-show('landing');
+/* ---------- start ---------- */
+(async function boot(){
+  try{
+    const {data}=await sb.auth.getSession();
+    if(data&&data.session){ await onSignedIn(data.session.user); return; }
+  }catch(e){ /* fall through to the sign-in screen */ }
+  authStep(1);
+  show('auth');
+})();
 </script>
