@@ -157,6 +157,11 @@
   .names b{color:var(--ink);font-weight:600}
   .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--brass-soft);color:var(--brass);margin-left:5px;vertical-align:1px}
   .empty{text-align:center;color:var(--muted);padding:30px 10px}
+  label.remember{display:flex;align-items:center;gap:9px;width:fit-content;margin:14px 0 0 2px;font-size:14px;color:var(--muted);cursor:pointer}
+  label.remember input{width:17px;height:17px;margin:0;accent-color:var(--pine);cursor:pointer}
+  label.remember:focus-within{color:var(--ink)}
+  /* display:flex outranks the browser's own [hidden] rule, so say it here. */
+  label.remember[hidden]{display:none}
   .minor{margin-top:24px;text-align:center}
   .link{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer}
   .banner{background:#fff7e6;border:1px solid #eabf73;color:#7a5411;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:14px}
@@ -206,6 +211,9 @@
       <div id="authOk" class="ok" style="display:none"></div>
     </div>
     <button class="btn btn-primary block" id="authBtn">Send me a link</button>
+    <!-- Outside the card so it reads as a setting for the button above it, and
+         outside authStep1 so it needs hiding by hand once the email is sent. -->
+    <label class="remember" id="rememberRow"><input id="rememberMe" type="checkbox"> Remember me</label>
   </section>
 
   <!-- LANDING -->
@@ -322,6 +330,34 @@ const REDIRECT_TO=location.origin+location.pathname;
    asking for the address a second time. */
 const PENDING_KEY='sarajevo_pending_email';
 
+/* Sessions normally live until someone signs out. Without "remember me" we put a
+   deadline on them instead, so a phone left on a table does not stay signed in.
+   The clock starts at sign-in and is never extended: a fresh page load must not
+   buy another 12 hours, or the deadline would never arrive on a device in daily
+   use. Both keys are read on the device that signed in, so a link opened in some
+   other browser simply falls back to the safe default of a deadline. */
+const REMEMBER_KEY='sarajevo_remember_me';
+const EXPIRES_KEY='sarajevo_session_expires';
+const SESSION_MAX_MS=12*60*60*1000;
+
+function wantsRemember(){
+  try{ return localStorage.getItem(REMEMBER_KEY)==='1'; }catch(e){ return false; }
+}
+
+/* Called only where a session is actually created, never on page load. */
+function stampSessionDeadline(){
+  try{
+    if(wantsRemember()) localStorage.removeItem(EXPIRES_KEY);
+    else localStorage.setItem(EXPIRES_KEY,String(Date.now()+SESSION_MAX_MS));
+  }catch(e){ /* private mode: the session just behaves as it did before */ }
+}
+
+function sessionExpired(){
+  let until='';
+  try{ until=localStorage.getItem(EXPIRES_KEY)||''; }catch(e){ return false; }
+  return !!until&&Date.now()>Number(until);
+}
+
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
 });
@@ -419,6 +455,7 @@ function authStep(n){
   $('#authStep1').hidden=(n!==1);
   $('#authStep2').hidden=(n!==2);
   $('#authStep3').hidden=(n!==3);
+  $('#rememberRow').hidden=(n!==1);
   $('#authBtn').textContent=(n===1)?'Send me a link':(n===2)?'Sign in':'Finish signing in';
   clearAuthMsg();
   if(n===2){ $('#sentTo').textContent=state.pendingEmail; $('#code').value=''; $('#code').focus(); }
@@ -431,7 +468,12 @@ async function sendCode(){
   const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:REDIRECT_TO}});
   btn.disabled=false;
   if(error){ btn.textContent='Send me a link'; authError(error.message||'Could not send the email. Please try again.'); return; }
-  try{ localStorage.setItem(PENDING_KEY,email); }catch(e){ /* private mode: the code field still works, it just asks again */ }
+  try{
+    localStorage.setItem(PENDING_KEY,email);
+    /* Stored now because the choice is made here but used at sign-in, which may
+       happen on the next page load when a mail link is what finishes it. */
+    localStorage.setItem(REMEMBER_KEY,$('#rememberMe').checked?'1':'0');
+  }catch(e){ /* private mode: the code field still works, it just asks again */ }
   state.pendingEmail=email;
   authStep(2);
 }
@@ -446,6 +488,7 @@ async function verifyCode(){
     authError((error&&error.message)||'That code did not work. Check it, or ask for a new one.');
     return;
   }
+  stampSessionDeadline();
   await onSignedIn(data.session.user);
 }
 
@@ -457,14 +500,27 @@ async function resend(){
   else authOk('A new email is on its way.');
 }
 
-async function signOut(){
+async function signOut(message){
   await sb.auth.signOut();
+  try{ localStorage.removeItem(EXPIRES_KEY); }catch(e){}
   state.user=null; state.name=''; state.hasSaved=false; state.pendingEmail='';
   blankAnswers();
   $('#name').value=''; $('#email').value='';
   authStep(1);
   show('auth');
+  if(message) authError(message);
 }
+
+const EXPIRY_NOTICE='Your 12 hours are up, so we signed you out. Sign in again — your answers are saved.';
+
+/* A tab left open would otherwise sail past the deadline untouched, and phones
+   keep tabs alive for days. Checking on return covers the common case; the timer
+   covers a tab someone is staring at. */
+async function enforceSessionDeadline(){
+  if(state.user&&sessionExpired()) await signOut(EXPIRY_NOTICE);
+}
+setInterval(enforceSessionDeadline,60*1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) enforceSessionDeadline(); });
 
 /* Load whatever this person saved before, so they edit instead of starting blank. */
 async function onSignedIn(user){
@@ -799,7 +855,7 @@ async function finishLinkSignIn(){
   btn.disabled=false;
   pendingLink=null;
 
-  if(session){ await onSignedIn(session.user); return; }
+  if(session){ stampSessionDeadline(); await onSignedIn(session.user); return; }
 
   let remembered='';
   try{ remembered=localStorage.getItem(PENDING_KEY)||''; }catch(e){}
@@ -819,9 +875,25 @@ async function finishLinkSignIn(){
   if(tokenHash){ pendingLink={token_hash:tokenHash,type:q.get('type')||'email'}; }
   if(tokenHash||linkFailure()) cleanUrl();
 
+  $('#rememberMe').checked=wantsRemember();
+
   try{
     const {data}=await sb.auth.getSession();
-    if(data&&data.session){ pendingLink=null; await onSignedIn(data.session.user); return; }
+    if(data&&data.session){
+      /* An expired session still exists in the browser, so it has to be cleared
+         before the deadline means anything. A fresh link in the URL wins over an
+         expired session — that person is signing in again right now. */
+      if(sessionExpired()&&!pendingLink){
+        await sb.auth.signOut();
+        try{ localStorage.removeItem(EXPIRES_KEY); }catch(e){}
+        authStep(1);
+        show('auth');
+        authError(EXPIRY_NOTICE);
+        return;
+      }
+      if(!sessionExpired()){ pendingLink=null; await onSignedIn(data.session.user); return; }
+      await sb.auth.signOut();
+    }
   }catch(e){ /* fall through to the sign-in screen */ }
 
   if(pendingLink){ authStep(3); show('auth'); return; }
