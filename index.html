@@ -1,6 +1,9 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The sign-in link carries its token in the query string, so the URL must not
+     travel anywhere. Without this the CDN request below would receive it. -->
+<meta name="referrer" content="no-referrer">
 <title>Sarajevo trip planner</title>
 <style>
   :root{
@@ -182,15 +185,15 @@
     <div class="card">
       <div id="authStep1">
         <label class="fld" for="email">Your email</label>
-        <p class="hint">We will send you a 6-digit code.</p>
+        <p class="hint">We will email you a sign-in link. There is a 6-digit code in the same email if the link does not work.</p>
         <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
       </div>
       <div id="authStep2" hidden>
         <label class="fld" for="code">Your code</label>
-        <p class="hint">We sent a 6-digit code to <b id="sentTo"></b>. If it does not turn up, check your spam folder.</p>
+        <p class="hint">We sent a link and a 6-digit code to <b id="sentTo"></b>. Click the link, or type the code here. If it does not turn up, check your spam folder.</p>
         <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
         <div class="minor" style="margin-top:14px">
-          <button class="link" id="resendCode">Send a new code</button>
+          <button class="link" id="resendCode">Send a new email</button>
           &nbsp;·&nbsp;
           <button class="link" id="changeEmail">Use a different email</button>
         </div>
@@ -198,7 +201,7 @@
       <div id="authErr" class="err" style="margin-left:0;display:none"></div>
       <div id="authOk" class="ok" style="display:none"></div>
     </div>
-    <button class="btn btn-primary block" id="authBtn">Send me a code</button>
+    <button class="btn btn-primary block" id="authBtn">Send me a link</button>
   </section>
 
   <!-- LANDING -->
@@ -301,8 +304,22 @@ const QS=[
 const SUPABASE_URL='https://iqffgffgqgtwltdvvlfv.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZmZnZmZncWd0d2x0ZHZ2bGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODI2NDQsImV4cCI6MjA5OTk1ODY0NH0.AOyTSmQdBd8mp9sNuEpBZtcJUYP27HPlR1IRR8hV5wo';
 const TABLE='sarajevo_survey_responses';
+/* Read the fragment before createClient runs: the client strips it while it
+   picks up the session, so anything we want from it must be grabbed first. */
+const ARRIVAL_HASH=location.hash;
+
+/* Where the sign-in link sends people back to. Whatever this resolves to must
+   also be listed under Authentication -> URL Configuration in Supabase, or the
+   link dead-ends. Deriving it from the current page keeps local testing and the
+   published site working from the same code. */
+const REDIRECT_TO=location.origin+location.pathname;
+
+/* Remembered so a burnt link can drop straight into the code field instead of
+   asking for the address a second time. */
+const PENDING_KEY='sarajevo_pending_email';
+
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
-  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
 });
 
 async function saveResponse(){
@@ -394,7 +411,7 @@ function clearAuthMsg(){ $('#authErr').style.display='none'; $('#authOk').style.
 function authStep(n){
   $('#authStep1').hidden=(n!==1);
   $('#authStep2').hidden=(n!==2);
-  $('#authBtn').textContent=(n===1)?'Send me a code':'Sign in';
+  $('#authBtn').textContent=(n===1)?'Send me a link':'Sign in';
   clearAuthMsg();
   if(n===2){ $('#sentTo').textContent=state.pendingEmail; $('#code').value=''; $('#code').focus(); }
 }
@@ -403,9 +420,10 @@ async function sendCode(){
   const email=$('#email').value.trim();
   if(!/^\S+@\S+\.\S+$/.test(email)){ authError('Please type a valid email address.'); return; }
   const btn=$('#authBtn'); btn.disabled=true; btn.textContent='Sending…';
-  const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:REDIRECT_TO}});
   btn.disabled=false;
-  if(error){ btn.textContent='Send me a code'; authError(error.message||'Could not send the code. Please try again.'); return; }
+  if(error){ btn.textContent='Send me a link'; authError(error.message||'Could not send the email. Please try again.'); return; }
+  try{ localStorage.setItem(PENDING_KEY,email); }catch(e){ /* private mode: the code field still works, it just asks again */ }
   state.pendingEmail=email;
   authStep(2);
 }
@@ -425,10 +443,10 @@ async function verifyCode(){
 
 async function resend(){
   const btn=$('#resendCode'); btn.disabled=true;
-  const {error}=await sb.auth.signInWithOtp({email:state.pendingEmail,options:{shouldCreateUser:true}});
+  const {error}=await sb.auth.signInWithOtp({email:state.pendingEmail,options:{shouldCreateUser:true,emailRedirectTo:REDIRECT_TO}});
   btn.disabled=false;
-  if(error) authError(error.message||'Could not send a new code.');
-  else authOk('A new code is on its way.');
+  if(error) authError(error.message||'Could not send a new email.');
+  else authOk('A new email is on its way.');
 }
 
 async function signOut(){
@@ -731,11 +749,67 @@ $('#clearMine').addEventListener('click',async()=>{
 });
 
 /* ---------- start ---------- */
+
+/* Supabase reports a spent or invalid link as an error in the fragment. Mail
+   scanners at Outlook and Gmail open links on the recipient's behalf, which
+   burns them before a person ever clicks, so this is an expected arrival, not
+   an edge case. The same email still carries a working code. */
+function linkFailure(){
+  const p=new URLSearchParams(ARRIVAL_HASH.replace(/^#/,''));
+  return p.get('error_code')||p.get('error');
+}
+
+/* Tokens and errors have served their purpose once read; leaving them in the
+   address bar puts them in history and in anything the page is shared with.
+   The app carries no other query string, so dropping the whole thing is safe. */
+function cleanUrl(){ history.replaceState({},'',location.pathname); }
+
+/* The sign-in link points at this page carrying a token hash, rather than at
+   Supabase's verify endpoint. Mail scanners at Outlook and Gmail open links on
+   the recipient's behalf; they fetch HTML but do not run scripts, so they load
+   this page and stop. The token is only spent below, in a real browser. Link
+   and code are the same one-time token, so this is what keeps a scanner from
+   burning both before their owner gets to either. */
+async function sessionFromLink(){
+  const q=new URLSearchParams(location.search);
+  const token_hash=q.get('token_hash');
+  if(!token_hash) return null;
+  try{
+    const {data,error}=await sb.auth.verifyOtp({token_hash,type:q.get('type')||'email'});
+    return {user:(data&&data.session)?data.session.user:null,error};
+  }catch(e){
+    return {user:null,error:e};
+  }
+}
+
 (async function boot(){
+  let remembered='';
+  try{ remembered=localStorage.getItem(PENDING_KEY)||''; }catch(e){}
+
+  const link=await sessionFromLink();
+  let linkFailed=link?!link.user:!!linkFailure();
+  if(link||linkFailure()) cleanUrl();
+  if(link&&link.user){ await onSignedIn(link.user); return; }
+
   try{
     const {data}=await sb.auth.getSession();
-    if(data&&data.session){ await onSignedIn(data.session.user); return; }
+    if(data&&data.session){ cleanUrl(); await onSignedIn(data.session.user); return; }
   }catch(e){ /* fall through to the sign-in screen */ }
+
+  if(linkFailed){
+    if(remembered){
+      state.pendingEmail=remembered;
+      authStep(2);
+      show('auth');
+      authError('That sign-in link did not work. Type the 6-digit code from the same email, or ask for a new one.');
+      return;
+    }
+    authStep(1);
+    show('auth');
+    authError('That sign-in link did not work. Enter your email and we will send a fresh one.');
+    return;
+  }
+
   authStep(1);
   show('auth');
 })();
