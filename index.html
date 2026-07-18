@@ -508,7 +508,7 @@ async function signOut(message){
   $('#name').value=''; $('#email').value='';
   authStep(1);
   show('auth');
-  if(message) authError(message);
+  if(typeof message==='string'&&message) authError(message);
 }
 
 const EXPIRY_NOTICE='Your 12 hours are up, so we signed you out. Sign in again — your answers are saved.';
@@ -784,8 +784,10 @@ $('#code').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault(
 $('#code').addEventListener('input',clearAuthMsg);
 $('#changeEmail').addEventListener('click',()=>authStep(1));
 $('#resendCode').addEventListener('click',resend);
-$('#signOutLanding').addEventListener('click',signOut);
-$('#signOutResults').addEventListener('click',signOut);
+/* Wrapped, not passed straight in: a listener receives the click event, which
+   signOut would otherwise show to the user as its message. */
+$('#signOutLanding').addEventListener('click',()=>signOut());
+$('#signOutResults').addEventListener('click',()=>signOut());
 
 $('#startBtn').addEventListener('click',async()=>{
   const err=$('#landErr');
