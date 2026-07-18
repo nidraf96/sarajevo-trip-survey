@@ -198,6 +198,10 @@
           <button class="link" id="changeEmail">Use a different email</button>
         </div>
       </div>
+      <div id="authStep3" hidden>
+        <label class="fld">Almost there</label>
+        <p class="hint">Press the button below to finish signing in.</p>
+      </div>
       <div id="authErr" class="err" style="margin-left:0;display:none"></div>
       <div id="authOk" class="ok" style="display:none"></div>
     </div>
@@ -408,10 +412,14 @@ function authError(m){ const e=$('#authErr'); e.textContent=m; e.style.display='
 function authOk(m){ const e=$('#authOk'); e.textContent=m; e.style.display='block'; $('#authErr').style.display='none'; }
 function clearAuthMsg(){ $('#authErr').style.display='none'; $('#authOk').style.display='none'; }
 
+let authStepNum=1;
+
 function authStep(n){
+  authStepNum=n;
   $('#authStep1').hidden=(n!==1);
   $('#authStep2').hidden=(n!==2);
-  $('#authBtn').textContent=(n===1)?'Send me a link':'Sign in';
+  $('#authStep3').hidden=(n!==3);
+  $('#authBtn').textContent=(n===1)?'Send me a link':(n===2)?'Sign in':'Finish signing in';
   clearAuthMsg();
   if(n===2){ $('#sentTo').textContent=state.pendingEmail; $('#code').value=''; $('#code').focus(); }
 }
@@ -709,7 +717,11 @@ function resetAnswer(){
 }
 
 /* ---------- wiring ---------- */
-$('#authBtn').addEventListener('click',()=>{ $('#authStep2').hidden?sendCode():verifyCode(); });
+$('#authBtn').addEventListener('click',()=>{
+  if(authStepNum===3) finishLinkSignIn();
+  else if(authStepNum===2) verifyCode();
+  else sendCode();
+});
 $('#email').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();sendCode();} });
 $('#email').addEventListener('input',clearAuthMsg);
 $('#code').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();verifyCode();} });
@@ -764,39 +776,59 @@ function linkFailure(){
    The app carries no other query string, so dropping the whole thing is safe. */
 function cleanUrl(){ history.replaceState({},'',location.pathname); }
 
-/* The sign-in link points at this page carrying a token hash, rather than at
-   Supabase's verify endpoint. Mail scanners at Outlook and Gmail open links on
-   the recipient's behalf; they fetch HTML but do not run scripts, so they load
-   this page and stop. The token is only spent below, in a real browser. Link
-   and code are the same one-time token, so this is what keeps a scanner from
-   burning both before their owner gets to either. */
-async function sessionFromLink(){
-  const q=new URLSearchParams(location.search);
-  const token_hash=q.get('token_hash');
-  if(!token_hash) return null;
+/* The sign-in link carries a token hash to this page rather than to Supabase's
+   verify endpoint, and the token is spent here instead of on arrival.
+
+   Both halves are needed. Mail scanners open links on the recipient's behalf,
+   and link and code are the same one-time token, so a scanner that reaches the
+   token first burns both. Pointing the link here defeats scanners that only
+   fetch HTML — but this project's auth log caught Microsoft POSTing to /verify
+   from 72.153.231.68, which means their scanner runs the page's scripts too.
+   What it does not do is press buttons, so that is where the token is spent. */
+let pendingLink=null;
+
+async function finishLinkSignIn(){
+  if(!pendingLink) return;
+  const btn=$('#authBtn'); btn.disabled=true; btn.textContent='Signing in…';
+  let session=null,failure=null;
   try{
-    const {data,error}=await sb.auth.verifyOtp({token_hash,type:q.get('type')||'email'});
-    return {user:(data&&data.session)?data.session.user:null,error};
-  }catch(e){
-    return {user:null,error:e};
+    const {data,error}=await sb.auth.verifyOtp(pendingLink);
+    session=(data&&data.session)||null;
+    failure=error;
+  }catch(e){ failure=e; }
+  btn.disabled=false;
+  pendingLink=null;
+
+  if(session){ await onSignedIn(session.user); return; }
+
+  let remembered='';
+  try{ remembered=localStorage.getItem(PENDING_KEY)||''; }catch(e){}
+  if(remembered){
+    state.pendingEmail=remembered;
+    authStep(2);
+    authError('That sign-in link did not work. Type the 6-digit code from the same email, or ask for a new one.');
+  }else{
+    authStep(1);
+    authError((failure&&failure.message)||'That sign-in link did not work. Enter your email and we will send a fresh one.');
   }
 }
 
 (async function boot(){
-  let remembered='';
-  try{ remembered=localStorage.getItem(PENDING_KEY)||''; }catch(e){}
-
-  const link=await sessionFromLink();
-  let linkFailed=link?!link.user:!!linkFailure();
-  if(link||linkFailure()) cleanUrl();
-  if(link&&link.user){ await onSignedIn(link.user); return; }
+  const q=new URLSearchParams(location.search);
+  const tokenHash=q.get('token_hash');
+  if(tokenHash){ pendingLink={token_hash:tokenHash,type:q.get('type')||'email'}; }
+  if(tokenHash||linkFailure()) cleanUrl();
 
   try{
     const {data}=await sb.auth.getSession();
-    if(data&&data.session){ cleanUrl(); await onSignedIn(data.session.user); return; }
+    if(data&&data.session){ pendingLink=null; await onSignedIn(data.session.user); return; }
   }catch(e){ /* fall through to the sign-in screen */ }
 
-  if(linkFailed){
+  if(pendingLink){ authStep(3); show('auth'); return; }
+
+  if(linkFailure()){
+    let remembered='';
+    try{ remembered=localStorage.getItem(PENDING_KEY)||''; }catch(e){}
     if(remembered){
       state.pendingEmail=remembered;
       authStep(2);
