@@ -206,8 +206,7 @@
     <p class="lead">Answer seven quick questions so we can build a plan that fits everyone. It takes about two minutes.</p>
     <div class="card">
       <label class="fld" for="name">Your name</label>
-      <p class="hint">Answering just for yourself? Use your own name. Answering for your whole family? Use your family name.</p>
-      <input id="name" type="text" autocomplete="off" placeholder="e.g. Amina, or the Hodžić family">
+      <input id="name" type="text" autocomplete="off" placeholder="e.g. Amina">
       <div id="landErr" class="err" style="margin-left:0;display:none"></div>
       <div class="whoami">
         <span>Signed in as <b id="whoLanding"></b></span>
@@ -356,14 +355,31 @@ const $=s=>document.querySelector(s);
 const views={boot:$('#v-boot'),auth:$('#v-auth'),landing:$('#v-landing'),form:$('#v-form'),done:$('#v-done'),results:$('#v-results')};
 let current='boot';
 
-function show(v){
+/* Views the browser Back button should step through. 'boot' and 'auth' are left
+   out on purpose: from the first screen after signing in, Back leaves the site
+   the way a browser normally would. */
+const NAV_VIEWS=['landing','form','done','results'];
+
+function show(v,fromPop){
+  const prev=current;
   current=v;
   Object.entries(views).forEach(([k,el])=>{el.hidden=(k!==v)});
   $('#bar').style.display=(v==='form')?'block':'none';
   if(v==='results') renderResults();
   if(v==='landing'||v==='results') paintWhoAmI();
   window.scrollTo({top:0,behavior:'auto'});
+
+  if(fromPop || !NAV_VIEWS.includes(v)) return;
+  /* Moving between two tracked views adds a step to go back to. Arriving from
+     sign-in only lays down the starting point, so Back still exits the site. */
+  if(NAV_VIEWS.includes(prev) && prev!==v) history.pushState({view:v},'');
+  else history.replaceState({view:v},'');
 }
+
+window.addEventListener('popstate',e=>{
+  const v=e.state&&e.state.view;
+  if(v&&views[v]&&state.user) show(v,true);
+});
 function paintWhoAmI(){
   const e=state.user?state.user.email:'';
   $('#whoLanding').textContent=e;
@@ -474,7 +490,9 @@ function renderForm(){
     div.appendChild(opts);
     if(q.custom){
       const adder=document.createElement('div'); adder.className='adder';
-      const ph = (q.type==='ranked') ? 'Add your own interest' : 'Add your own answer';
+      const ph = (q.type==='ranked') ? 'Add your own interest'
+               : (q.id==='q1')      ? 'Add your own opinion'
+               :                      'Add your own answer';
       adder.innerHTML=`<input type="text" id="add-${q.id}" maxlength="60" autocomplete="off" placeholder="${ph}"><button type="button" class="addbtn" data-q="${q.id}">Add</button>`;
       div.appendChild(adder);
     }
