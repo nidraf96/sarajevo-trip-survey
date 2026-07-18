@@ -16,7 +16,7 @@ godkjenningsspørsmål, og vis alltid hva du faktisk har verifisert kontra antat
 
 ## Arkitektur
 
-Én fil: `index.html` (~740 linjer). Ingen byggesteg, ingen avhengigheter utover
+Én fil: `index.html` (~850 linjer). Ingen byggesteg, ingen avhengigheter utover
 Supabase-klienten fra CDN. **Deploy = `git push origin main`** → GitHub Pages plukker det
 opp på 1–2 minutter.
 
@@ -30,23 +30,33 @@ Appen er én side som viser/skjuler seks views (`boot`, `auth`, `landing`, `form
 ett steg innad i appen; `boot` og `auth` er bevisst utenfor, så Tilbake fra første skjerm
 forlater siden normalt.
 
-## Innlogging: fire innstillinger som henger sammen
+## Innlogging: fem ting som henger sammen
 
-Dagens løsning er **6-sifret engangskode** (OTP), ikke magic link. Disse fire må endres
-samlet — endrer du én alene, slutter innlogging å virke:
+Dagens løsning er **lenke og 6-sifret kode i samme e-post**. Endrer du én av disse alene,
+slutter innlogging å virke:
 
 | Hvor | Innstilling |
 |---|---|
-| `index.html`, `verifyCode()` | Krever nøyaktig 6 siffer (`/^\d{6}$/`) |
-| Supabase → Sign In / Providers → Email | **Email OTP Length = 6** |
-| Supabase → Emails → maler | **Magic Link** og **Confirm signup** bruker begge `{{ .Token }}` |
+| `index.html`, `createClient` | `detectSessionInUrl: true` |
+| `index.html`, `signInWithOtp` | `emailRedirectTo: REDIRECT_TO` (= `location.origin+location.pathname`) |
+| Supabase → URL Configuration | Site URL = GitHub Pages-URL-en. Redirect URLs må inneholde **både** den og `http://127.0.0.1:8777/` for lokal test |
+| Supabase → Emails → maler | Begge peker på `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=…` — `type=magiclink` i Magic Link, `type=signup` i Confirm signup |
 | Supabase → Emails → SMTP | Resend: `smtp.resend.com:465`, bruker `resend`, fra `noreply@mail.peakpoint.no` |
 
 Begge malene må endres, ikke bare Magic Link: `signInWithOtp` står med
-`shouldCreateUser: true`, så nye brukere kan få Confirm signup-malen.
+`shouldCreateUser: true`, så nye brukere kan få Confirm signup-malen. Ulik `type` i de to
+er ikke slurv — feil `type` gir avvist nøkkel.
+
+**Lenke og kode er samme engangsnøkkel.** Supabase-dokumentasjonen: *"Email OTPs share an
+implementation with Magic Links."* Brukes den ene, dør den andre. Levetid 1 time
+(`Email OTP Expiration`, maks 24 t). Gjenbruk er ikke mulig — engangsbruk er hardkodet.
+Det spiller liten rolle i praksis: `persistSession: true` gjør at én innlogging varer til
+brukeren logger ut eller sletter nettleserdata.
 
 Rate limit for e-post er hevet til 100/time (prosjektomfattende). De øvrige grensene er
-per IP-adresse og trenger ikke endring for 11 personer.
+per IP-adresse og trenger ikke endring for 11 personer. I tillegg finnes en sperre på ca.
+60 s mellom hver e-post til *samme* adresse (`over_email_send_rate_limit`, HTTP 429) — en
+utålmodig bruker som trykker flere ganger får den, og det er normalt.
 
 ## Åpen dør, med en planlagt lås
 
@@ -64,19 +74,30 @@ Ikke løs dette med en liste over tillatte adresser i `index.html`. Sperren vill
 hos den som skal stoppes, og du ville publisert 11 privatpersoners e-postadresser i et
 offentlig repo.
 
-## Hvis magic link skal vurderes (åpent spørsmål fra eieren)
+## Knappen «Finish signing in» — ikke fjern den
 
-Dette er kartlagt, men ikke utført. Verifiser hvert punkt selv før du bygger:
+Trykk på lenken viser en bekreftelsesknapp i stedet for å logge inn med en gang. Det ser
+ut som et unødvendig ekstra trinn. Det er det ikke.
 
-1. Begge maler tilbake til `{{ .ConfirmationURL }}`.
-2. `detectSessionInUrl` står i dag på `false` i `createClient` — må bli `true`.
-3. **Site URL og Redirect URLs i Supabase er ikke verifisert konfigurert.** Da eieren
-   testet magic link 2026-07-18, endte klikk på lenken på en feilside. Det peker mot
-   manglende redirect-oppsett, men er ikke bekreftet — sjekk før du konkluderer.
-4. `verifyCode()` og hele kode-inntastingen blir overflødig; appen må i stedet ta imot en
-   sesjon ved retur.
-5. Kjent risiko å undersøke: e-postskannere hos Gmail/Outlook kan forhåndsåpne lenker og
-   brenne engangslenken før mottakeren rekker å klikke. Gjelder ikke koder.
+Microsofts e-postskanner åpner hver eneste lenke som sendes til Hotmail/Outlook-adresser.
+Målt i prosjektets egen auth-logg 2026-07-18, med tre nivåer av mottiltak:
+
+| Oppsett | Hva skanneren gjorde |
+|---|---|
+| Lenke rett til Supabase `/verify` | `GET` fra `104.47.*`, `135.232.*`, `72.153.*` — brant nøkkelen |
+| Lenke til egen side, innløsning ved sidelast | **`POST /verify` fra `72.153.231.68` kl. 21:26:17** — skanneren kjører JavaScript |
+| Lenke til egen side, innløsning ved knappetrykk | Ingen treff. E-post sendt 21:35:49, innlogging 21:37:33, ingen Microsoft-adresse i vinduet |
+
+Skanneren kjører altså skript, men trykker ikke på knapper. Flytter du innløsningen
+tilbake til sidelast, brenner Outlook lenkene til flere av de 11 igjen.
+
+Skanneren traff historisk 25–60 s etter utsending. Tester du dette, **vent minst 2
+minutter før du trykker** — ellers vinner du kappløpet og beviser ingenting.
+
+**Nøkkelen ligger i query-strengen** (`?token_hash=…`), ikke bak `#`, så den sendes til
+GitHub sine servere. Derfor står `<meta name="referrer" content="no-referrer">` i `<head>`
+— uten den lekker adressen med nøkkel til CDN-en på linje 270. Engangsbruken er det som
+gjør plasseringen forsvarlig: gjør du lenken gjenbrukbar, faller den begrunnelsen bort.
 
 ## Arbeidsflyt
 
@@ -86,7 +107,14 @@ Dette er kartlagt, men ikke utført. Verifiser hvert punkt selv før du bygger:
 - Etter kodeendring i `index.html`: sjekk at JavaScript-en parser før publisering
   (klipp ut `<script>`-blokken og kjør `node --check`).
 - Etter publisering: bekreft mot den ekte URL-en, ikke mot lokal fil.
+- **Feilsøk innlogging i auth-loggen, ikke ved å gjette.** Supabase MCP → `get_logs` med
+  `service: "auth"` (siste 24 t). Svaret er for stort til å leses rått — parse `event_message`
+  som JSON og se på `path`, `method`, `status`, `remote_addr`, `login_method`, `error_code`.
+  `remote_addr` skiller mennesket fra skanneren, og `method` skiller lenke fra kode.
+  Loggen har ligget noen sekunder etter sanntid; spør to ganger før du konkluderer med
+  at noe *ikke* skjedde.
 - Slett testbrukere når testingen er ferdig — undersøkelsen skal inneholde 11 ekte svar.
+  Sjekk først: per 2026-07-18 finnes bare eierens egen konto, uten svar. Den skal stå.
 - Blir konteksten lang: skriv tilstand til fil og start fersk økt. Ikke stol på
   auto-compaction.
 
