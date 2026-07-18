@@ -1,0 +1,511 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sarajevo trip planner</title>
+<style>
+  :root{
+    --bg:#e9efeb;
+    --surface:#ffffff;
+    --ink:#14201c;
+    --muted:#5b6a63;
+    --pine:#0f473c;
+    --pine-700:#0b362e;
+    --brass:#a9781f;
+    --brass-soft:#f2e6cc;
+    --orange:#c26a1e;
+    --line:#d6ddd8;
+    --line-strong:#c3ccc6;
+    --shadow:0 1px 2px rgba(20,32,28,.06),0 8px 24px rgba(20,32,28,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:660px;margin:0 auto;padding:0 16px 120px}
+  .serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif}
+
+  /* Header */
+  header{background:var(--pine);color:#f3f6f4;border-radius:0 0 20px 20px;box-shadow:var(--shadow)}
+  .head-inner{max-width:660px;margin:0 auto;padding:22px 20px 0}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#bcd2c9;margin:0}
+  h1{margin:4px 0 2px;font-size:30px;line-height:1.05;font-weight:600}
+  .dates{margin:0 0 16px;color:#cfe0d8;font-size:15px}
+  .ridge{display:block;width:100%;height:26px}
+
+  /* Views */
+  .view{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.view{animation:none}*{transition:none!important}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 16px;margin-top:16px}
+  .lead{margin:16px 2px 0;color:var(--muted);font-size:15px}
+  .hint{color:var(--muted);font-size:13px;margin:0 0 8px}
+
+  label.fld{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+  input[type=text]{
+    width:100%;padding:12px 14px;border:1px solid var(--line-strong);border-radius:10px;
+    font-size:16px;background:#fbfcfb;color:var(--ink)
+  }
+  input[type=text]:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 3px rgba(15,71,60,.15)}
+
+  .seg{display:flex;gap:8px;margin-top:8px}
+  .seg button{flex:1;padding:11px 8px;border:1px solid var(--line-strong);background:#fbfcfb;border-radius:10px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--pine);border-color:var(--pine);color:#fff}
+  .seg button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(15,71,60,.2)}
+
+  .q{padding:16px 0;border-top:1px solid var(--line)}
+  .q:first-child{border-top:0}
+  .qnum{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--brass-soft);color:var(--brass);font-size:12px;font-weight:700;margin-right:8px}
+  .qtitle{font-weight:600;font-size:16px}
+  .qhelp{color:var(--muted);font-size:13.5px;margin:4px 0 10px 30px}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-left:30px}
+  .opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;border:1px solid var(--line-strong);background:#fbfcfb;border-radius:11px;font-size:15px;color:var(--ink);cursor:pointer}
+  .opt .tick{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);flex:none}
+  .opt[aria-pressed=true]{border-color:var(--pine);background:#f1f6f3}
+  .opt[aria-pressed=true] .tick{border-color:var(--pine);background:var(--pine);box-shadow:inset 0 0 0 3px #fff}
+  .opt:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(15,71,60,.18)}
+  .opt.multi .tick{border-radius:5px}
+  .opt.multi[aria-pressed=true] .tick{background:var(--brass);border-color:var(--brass)}
+  .opt[disabled]{opacity:.45;cursor:not-allowed}
+  .counter{margin:2px 0 10px 30px;font-size:13px;color:var(--muted)}
+  .opt .badge{width:22px;height:22px;border-radius:50%;border:2px solid var(--line-strong);flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--pine)}
+  .opt.ranked[aria-pressed=true]{border-color:var(--brass);background:#fbf6ea}
+  .opt.ranked[aria-pressed=true] .badge{background:var(--brass);border-color:var(--brass);color:#fff}
+  .adder{display:flex;gap:8px;margin:10px 0 0 30px}
+  .adder input{flex:1;padding:10px 12px;font-size:15px;border:1px solid var(--line-strong);border-radius:10px;background:#fbfcfb;color:var(--ink)}
+  .adder input:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 3px rgba(15,71,60,.15)}
+  .addbtn{padding:0 16px;border:1px solid var(--pine);background:#fff;color:var(--pine);border-radius:10px;font-weight:700;cursor:pointer;font-size:14px}
+  .addbtn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(15,71,60,.2)}
+  .cust{color:var(--brass);font-style:normal;font-size:12px}
+  .subnote{color:var(--muted);font-size:12.5px;margin:2px 0 4px}
+  .optrow{display:flex;gap:8px;align-items:stretch}
+  .optrow .opt{flex:1}
+  .delbtn{flex:none;width:44px;border:1px solid var(--line-strong);background:#fff;border-radius:11px;color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
+  .delbtn:hover{border-color:#c98b7f;color:#8a2b1e;background:#fdf4f2}
+  .delbtn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(138,43,30,.18)}
+
+  .barbtn{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(233,239,235,0),var(--bg) 40%);padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+  .barbtn .inner{max-width:660px;margin:0 auto;display:flex;gap:10px}
+  .btn{flex:1;padding:15px;border-radius:12px;border:0;font-size:16px;font-weight:700;cursor:pointer}
+  .btn-primary{background:var(--pine);color:#fff}
+  .btn-primary:active{background:var(--pine-700)}
+  .btn-ghost{background:#fff;color:var(--pine);border:1px solid var(--line-strong);flex:none;padding-left:18px;padding-right:18px}
+  .btn-accent{background:var(--orange);color:#fff}
+  .btn-accent:active{filter:brightness(.93)}
+  .block{display:block;width:100%;margin-top:12px}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(15,71,60,.25)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  .tabs{display:flex;gap:8px;margin-top:16px}
+  .tabs button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:600;color:var(--muted);cursor:pointer}
+  .tabs button.active{background:var(--pine);border-color:var(--pine);color:#fff}
+
+  .err{color:#8a2b1e;font-size:14px;margin:10px 30px 0;font-weight:600}
+
+  /* Done */
+  .done{text-align:center;padding:34px 16px}
+  .check{width:56px;height:56px;border-radius:50%;background:var(--brass-soft);color:var(--brass);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px}
+
+  /* Results */
+  .rsum{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .pill{background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600}
+  .pill b{color:var(--pine)}
+  .filter{display:flex;gap:8px;margin-top:14px}
+  .filter button{flex:1;padding:9px;border-radius:10px;border:1px solid var(--line-strong);background:#fff;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer}
+  .filter button.active{background:var(--brass);border-color:var(--brass);color:#fff}
+  .rq{margin-top:18px}
+  .rq h3{margin:0 0 2px;font-size:15px}
+  .rq .rn{color:var(--brass);font-weight:700;margin-right:6px}
+  .row{margin-top:9px}
+  .row .rl{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+  .row .rl span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+  .track{height:12px;background:#eef2ef;border-radius:999px;overflow:hidden}
+  .fill{height:100%;background:var(--pine);border-radius:999px;width:0;transition:width .5s ease}
+  .fill.g{background:#2f8050}
+  .fill.o{background:var(--orange)}
+  .fill.r{background:#b3402f}
+  .track.flexrow{display:flex;height:18px}
+  .seg{height:100%}
+  .seg.s1{background:#0f473c}
+  .seg.s2{background:#2d6a52}
+  .seg.s3{background:#4f8a6d}
+  .seg.s4{background:#86b39c}
+  .seg.s5{background:#c2d9cd}
+  .legend{display:flex;align-items:center;gap:3px;font-size:11.5px;color:var(--muted);margin:2px 0 10px;flex-wrap:wrap}
+  .legend .ls{width:12px;height:12px;border-radius:3px;display:inline-block;margin-left:9px}
+  .legend .ls.s1{background:#0f473c}
+  .legend .ls.s2{background:#2d6a52}
+  .legend .ls.s3{background:#4f8a6d}
+  .legend .ls.s4{background:#86b39c}
+  .legend .ls.s5{background:#c2d9cd}
+  .names{margin-top:10px;font-size:13.5px;color:var(--muted)}
+  .names b{color:var(--ink);font-weight:600}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--brass-soft);color:var(--brass);margin-left:5px;vertical-align:1px}
+  .empty{text-align:center;color:var(--muted);padding:30px 10px}
+  .minor{margin-top:24px;text-align:center}
+  .link{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer}
+  .banner{background:#fff7e6;border:1px solid #eabf73;color:#7a5411;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:14px}
+</style>
+
+<header>
+  <div class="head-inner">
+    <p class="eyebrow">Group trip · Bosnia</p>
+    <h1 class="serif">Sarajevo</h1>
+    <p class="dates">26 Jul to 2 Aug · 11 of us</p>
+  </div>
+  <svg class="ridge" viewBox="0 0 660 26" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,26 L0,15 L70,6 L130,16 L210,3 L280,14 L340,7 L420,17 L500,5 L560,15 L620,8 L660,16 L660,26 Z" fill="#e9efeb"/>
+  </svg>
+</header>
+
+<div class="wrap">
+  <!-- LANDING -->
+  <section id="v-landing" class="view">
+    <p class="lead">Answer seven quick questions so we can build a plan that fits everyone. It takes about two minutes.</p>
+    <div class="card">
+      <label class="fld" for="name">Your name</label>
+      <p class="hint">Answering just for yourself? Use your own name. Answering for your whole family? Use your family name.</p>
+      <input id="name" type="text" autocomplete="off" placeholder="e.g. Amina, or the Hodžić family">
+      <div id="landErr" class="err" style="margin-left:0;display:none"></div>
+    </div>
+    <div id="landBanner"></div>
+    <button class="btn btn-primary block" id="startBtn">Start</button>
+    <button class="btn btn-accent block" id="goResultsFromLand">View results</button>
+  </section>
+
+  <!-- FORM -->
+  <section id="v-form" class="view" hidden>
+    <div class="card" id="formCard">
+      <div id="formQuestions"></div>
+      <div id="formErr" class="err" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- DONE -->
+  <section id="v-done" class="view" hidden>
+    <div class="card done">
+      <div class="check">✓</div>
+      <h2 class="serif" style="margin:0 0 4px">Answer saved</h2>
+      <p style="color:var(--muted);margin:0 0 18px">Thanks. You can change your answers any time from this device.</p>
+      <div class="tabs" style="margin-top:0">
+        <button class="active" id="doneResults">See results</button>
+        <button id="doneEdit">Edit my answers</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="v-results" class="view" hidden>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 class="serif" style="margin:0;font-size:22px">Results</h2>
+        <button class="link" id="refresh">Refresh</button>
+      </div>
+      <div class="rsum" id="rsum"></div>
+      <div id="rbody"></div>
+      <div class="minor">
+        <button class="link" id="clearMine">Clear my answer</button>
+      </div>
+    </div>
+    <button class="btn btn-primary block" id="editMine">Edit my answer</button>
+    <button class="btn btn-accent block" id="newAnswer">New answer</button>
+  </section>
+</div>
+
+<!-- STICKY BUTTON (form + landing) -->
+<div class="barbtn" id="bar">
+  <div class="inner">
+    <button class="btn btn-ghost" id="barBack">Back</button>
+    <button class="btn btn-primary" id="barMain">Save my answers</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ---------- data ---------- */
+const single=(id,title,help,options)=>({id,type:'single',title,help,options});
+const QS=[
+  single('q1','Plan for the week','Do most things together, or a flexible mix.',['Together (all 11)','Flexible (sometimes together, sometimes separate)']),
+  {id:'q2',type:'ranked',max:5,custom:true,title:'Your top interests',help:'Pick up to 5, in order of preference.',options:[
+    'Old town Baščaršija, bazaar and mosques',
+    'History and war history (Tunnel of Hope, museums)',
+    'Nature and mountains (Trebević cable car, Vrelo Bosne)',
+    'Food and coffee culture',
+    'Shopping and souvenirs',
+    'Day trip out of the city (Mostar, waterfalls)',
+    'Cafés and nightlife in the evening',
+    'Relaxing and spa or thermal baths',
+    'Active and adrenaline (rafting, zipline, hiking)',
+    'Friday prayer (jummah) at Gazi Husrev-beg Mosque',
+    'Gaming / FIFA'
+  ]},
+  single('q3','A full day trip to the Mostar area','Mostar, Blagaj and Kravice waterfalls.',['Yes','No']),
+  single('q6','Start of the day','',['Early (08:00 - 10:00)','Medium (10:00 - 12:00)','Late (12:00 - 14:00)']),
+  single('q7','Evenings out','',['Yes, until late','Yes, but not too late','No, I would rather relax at the villa in the evenings']),
+  single('q8','Breakfast together','',['Eat out','At the villa','A mix']),
+  single('q10','Which part of the day would you most like free time with no fixed plan?','',['Morning','Afternoon','Evening'])
+];
+
+/* ---------- storage (Supabase) ----------
+   Paste your two Supabase values below (Project Settings > API).
+   Until you do, answers stay only on this screen (in-memory),
+   which is fine for testing the app. */
+const SUPABASE_URL='https://iqffgffgqgtwltdvvlfv.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZmZnZmZncWd0d2x0ZHZ2bGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODI2NDQsImV4cCI6MjA5OTk1ODY0NH0.AOyTSmQdBd8mp9sNuEpBZtcJUYP27HPlR1IRR8hV5wo';
+const TABLE='sarajevo_survey_responses';
+const sb=(window.supabase && /^https?:\/\//.test(SUPABASE_URL))
+  ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;
+const hasStore=!!sb;
+const mem={};
+async function saveResponse(rec){
+  if(sb){ const {error}=await sb.from(TABLE).upsert({id:rec.id,data:rec}); if(error) throw error; return; }
+  mem[rec.id]=rec;
+}
+async function loadAll(){
+  if(sb){ const {data,error}=await sb.from(TABLE).select('data').order('created_at',{ascending:true}); if(error) throw error; return (data||[]).map(r=>r.data); }
+  return Object.values(mem);
+}
+async function deleteResponse(id){
+  if(sb){ const {error}=await sb.from(TABLE).delete().eq('id',id); if(error) throw error; return; }
+  delete mem[id];
+}
+
+/* ---------- state ---------- */
+const state={ name:'', answers:{}, custom:{}, myId:null };
+QS.forEach(q=>{ state.answers[q.id] = (q.type==='ranked')? [] : null; if(q.custom) state.custom[q.id]=[]; });
+
+const $=s=>document.querySelector(s);
+const views={landing:$('#v-landing'),form:$('#v-form'),done:$('#v-done'),results:$('#v-results')};
+let current='landing';
+
+function show(v){
+  current=v;
+  Object.entries(views).forEach(([k,el])=>{el.hidden=(k!==v)});
+  $('#bar').style.display=(v==='form')?'block':'none';
+  if(v==='results') renderResults();
+  window.scrollTo({top:0,behavior:'auto'});
+}
+
+/* ---------- landing ---------- */
+if(!hasStore){
+  $('#landBanner').innerHTML='<div class="banner">Shared saving turns on once your Supabase keys are added and the app is hosted. Right now answers stay only on this screen.</div>';
+}
+
+/* ---------- form render ---------- */
+function allOptions(q){ return q.options.concat(state.custom[q.id]||[]); }
+
+function renderForm(){
+  const wrap=$('#formQuestions'); wrap.innerHTML='';
+  QS.forEach((q,i)=>{
+    const div=document.createElement('div'); div.className='q';
+    let head=`<div><span class="qnum">${i+1}</span><span class="qtitle">${q.title}</span></div>`;
+    if(q.help) head+=`<div class="qhelp">${q.help}</div>`;
+    if(q.type==='ranked') head+=`<div class="counter" id="cnt-${q.id}"></div>`;
+    div.innerHTML=head;
+    const opts=document.createElement('div'); opts.className='opts'; opts.id='opts-'+q.id;
+    div.appendChild(opts);
+    if(q.custom){
+      const adder=document.createElement('div'); adder.className='adder';
+      adder.innerHTML=`<input type="text" id="add-${q.id}" maxlength="60" autocomplete="off" placeholder="Add your own interest"><button type="button" class="addbtn" data-q="${q.id}">Add</button>`;
+      div.appendChild(adder);
+    }
+    wrap.appendChild(div);
+    renderOpts(q);
+  });
+  wrap.querySelectorAll('.addbtn').forEach(b=>b.addEventListener('click',()=>{
+    const q=QS.find(x=>x.id===b.dataset.q), inp=$('#add-'+q.id);
+    addCustom(q,inp.value); inp.value=''; inp.focus();
+  }));
+  wrap.querySelectorAll('.adder input').forEach(inp=>inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); const q=QS.find(x=>x.id===inp.id.slice(4)); addCustom(q,inp.value); inp.value=''; }
+  }));
+}
+
+function renderOpts(q){
+  const cont=$('#opts-'+q.id); if(!cont) return;
+  const arr=state.answers[q.id];
+  let html='';
+  allOptions(q).forEach(opt=>{
+    if(q.type==='single'){
+      const on=arr===opt;
+      html+=`<button type="button" class="opt" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="tick"></span><span>${escapeHtml(opt)}</span></button>`;
+    }else{
+      const rank=arr.indexOf(opt), on=rank>-1, custom=(state.custom[q.id]||[]).includes(opt);
+      const btn=`<button type="button" class="opt ranked" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-pressed="${on}"><span class="badge">${on?rank+1:''}</span><span>${escapeHtml(opt)}${custom?' <em class="cust">(yours)</em>':''}</span></button>`;
+      html+= custom
+        ? `<div class="optrow">${btn}<button type="button" class="delbtn" data-q="${q.id}" data-opt="${escapeHtml(opt)}" aria-label="Delete this interest" title="Delete">🗑️</button></div>`
+        : btn;
+    }
+  });
+  cont.innerHTML=html;
+  cont.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',onOpt));
+  cont.querySelectorAll('.delbtn').forEach(b=>b.addEventListener('click',()=>deleteCustom(QS.find(x=>x.id===b.dataset.q), b.dataset.opt)));
+  if(q.type==='ranked'){
+    const c=$('#cnt-'+q.id); if(c) c.textContent=`${arr.length} of ${q.max} chosen`;
+    cont.querySelectorAll('.opt').forEach(b=>{
+      const chosen=b.getAttribute('aria-pressed')==='true';
+      b.disabled=(!chosen && arr.length>=q.max);
+    });
+  }
+}
+
+function onOpt(e){
+  const btn=e.currentTarget, qid=btn.dataset.q, opt=btn.dataset.opt;
+  const q=QS.find(x=>x.id===qid);
+  if(q.type==='single'){
+    state.answers[qid]=opt;
+    $('#opts-'+qid).querySelectorAll('.opt').forEach(o=>o.setAttribute('aria-pressed', o.dataset.opt===opt));
+  }else{
+    const arr=state.answers[qid], idx=arr.indexOf(opt);
+    if(idx>-1) arr.splice(idx,1);
+    else { if(arr.length>=q.max) return; arr.push(opt); }
+    renderOpts(q);
+  }
+  $('#formErr').style.display='none';
+}
+
+function addCustom(q,value){
+  value=(value||'').trim(); if(!value) return;
+  const dup=allOptions(q).some(o=>o.toLowerCase()===value.toLowerCase());
+  if(!dup)(state.custom[q.id]=state.custom[q.id]||[]).push(value);
+  const arr=state.answers[q.id];
+  if(!arr.includes(value)&&arr.length<q.max) arr.push(value);
+  renderOpts(q);
+  $('#formErr').style.display='none';
+}
+function deleteCustom(q,opt){
+  const cl=state.custom[q.id]||[]; const i=cl.indexOf(opt); if(i>-1) cl.splice(i,1);
+  const arr=state.answers[q.id]; const j=arr.indexOf(opt); if(j>-1) arr.splice(j,1);
+  renderOpts(q);
+}
+
+/* ---------- validation + submit ---------- */
+function firstMissing(){
+  for(const q of QS){
+    const a=state.answers[q.id];
+    if(q.type==='ranked'){ if(a.length<1) return q; }
+    else if(!a) return q;
+  }
+  return null;
+}
+async function submit(){
+  const miss=firstMissing();
+  if(miss){
+    const err=$('#formErr'); err.style.display='block';
+    err.textContent='Please answer question '+(QS.indexOf(miss)+1)+' before saving.';
+    return;
+  }
+  const main=$('#barMain'); main.disabled=true; main.textContent='Saving...';
+  if(!state.myId) state.myId='resp_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  const rec={id:state.myId,name:state.name,answers:state.answers,ts:Date.now()};
+  try{ await saveResponse(rec); }
+  catch(e){ main.disabled=false; main.textContent='Save my answers'; alert('Could not save right now. Check your connection and try again.'); return; }
+  main.disabled=false; main.textContent='Save my answers';
+  show('done');
+}
+
+/* ---------- results ---------- */
+let cache=[];
+async function loadResponses(){
+  let out=[];
+  try{ out=await loadAll(); }catch(e){ out=[]; }
+  out=out.filter(Boolean);
+  out.sort((a,b)=>(a.ts||0)-(b.ts||0)); cache=out;
+}
+async function renderResults(){
+  $('#rbody').innerHTML='<div class="empty">Loading…</div>';
+  await loadResponses();
+  paint();
+}
+function paint(){
+  const all=cache;
+  $('#rsum').innerHTML = `<span class="pill"><b>${all.length}</b> ${all.length===1?'response':'responses'}</span>`;
+  const data = all;
+  const body=$('#rbody');
+  if(all.length===0){ body.innerHTML='<div class="empty">No answers yet. Share this app with the group and results will appear here.</div>'; return; }
+  let html='';
+  QS.forEach((q,i)=>{
+    if(q.type==='ranked'){
+      const counts={},score={},places={},order=[];
+      data.forEach(r=>{ (r.answers[q.id]||[]).forEach((opt,idx)=>{
+        if(!(opt in counts)){counts[opt]=0;score[opt]=0;places[opt]=[0,0,0,0,0];order.push(opt);}
+        counts[opt]++; score[opt]+=(q.max-idx); if(idx<5) places[opt][idx]++;
+      });});
+      const items=order.sort((a,b)=>score[b]-score[a]||counts[b]-counts[a]);
+      const maxPicks=Math.max(1,...items.map(o=>counts[o]));
+      html+=`<div class="rq"><h3><span class="rn">${i+1}</span>${q.title}</h3>`;
+      html+=`<div class="subnote">Ordered by a balance of how many chose it and how high. Bar length = number of picks; darker = ranked higher.</div>`;
+      html+=`<div class="legend"><span class="ls s1"></span>1st<span class="ls s2"></span>2nd<span class="ls s3"></span>3rd<span class="ls s4"></span>4th<span class="ls s5"></span>5th</div>`;
+      if(items.length===0){ html+=`<div class="names">No interests picked yet.</div>`; }
+      items.forEach(o=>{
+        const isCustom=!q.options.includes(o);
+        const pct=data.length?Math.round(counts[o]/data.length*100):0;
+        const firsts=places[o][0];
+        let segs='';
+        for(let k=0;k<5;k++){ if(places[o][k]>0) segs+=`<div class="seg s${k+1}" style="width:${(places[o][k]/maxPicks*100).toFixed(2)}%"></div>`; }
+        html+=`<div class="row"><div class="rl"><span>${escapeHtml(o)}${isCustom?' <em class="cust">(added)</em>':''}</span>`+
+              `<span>${counts[o]} ${counts[o]===1?'pick':'picks'} · ${pct}%${firsts?` · ${firsts} as 1st`:''}</span></div>`+
+              `<div class="track flexrow">${segs}</div></div>`;
+      });
+      html+='</div>';
+      return;
+    }
+    const tally={}; q.options.forEach(o=>tally[o]=0);
+    data.forEach(r=>{ const a=r.answers[q.id]; if(a && a in tally) tally[a]++; });
+    const base=data.filter(r=>r.answers[q.id]).length;
+    const max=Math.max(1,...Object.values(tally));
+    html+=`<div class="rq"><h3><span class="rn">${i+1}</span>${q.title}</h3>`;
+    q.options.forEach(o=>{
+      const c=tally[o]; const pct=base?Math.round(c/base*100):0; const w=pct;
+      html+=`<div class="row"><div class="rl"><span>${escapeHtml(o)}</span><span>${c}${base?` · ${pct}%`:''}</span></div>`+
+            `<div class="track"><div class="fill ${pctClass(pct)}" data-w="${w}"></div></div></div>`;
+    });
+    html+='</div>';
+  });
+  // respondents
+  html+=`<div class="rq"><h3>Who has answered</h3><div class="names">`+
+        data.map(r=>`<b>${escapeHtml(r.name||'Someone')}</b>`).join(' &nbsp; ')+
+        `</div></div>`;
+  body.innerHTML=html;
+  requestAnimationFrame(()=>body.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w+'%'));
+}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function pctClass(p){ if(p>=75) return 'g'; if(p>=25) return 'o'; if(p>=1) return 'r'; return ''; }
+function resetAnswer(){
+  state.name=''; state.myId=null;
+  QS.forEach(q=>{ state.answers[q.id]=(q.type==='ranked')?[]:null; if(q.custom) state.custom[q.id]=[]; });
+  const n=$('#name'); if(n) n.value='';
+}
+
+/* ---------- wiring ---------- */
+$('#startBtn').addEventListener('click',()=>{
+  const err=$('#landErr');
+  if(!state.name.trim()){ err.style.display='block'; err.textContent='Please add your name first.'; return; }
+  err.style.display='none'; renderForm(); show('form');
+});
+$('#barMain').addEventListener('click',submit);
+$('#barBack').addEventListener('click',()=>show('landing'));
+$('#name').addEventListener('input',e=>{ state.name=e.target.value; $('#landErr').style.display='none'; });
+$('#goResultsFromLand').addEventListener('click',()=>show('results'));
+$('#doneResults').addEventListener('click',()=>show('results'));
+$('#doneEdit').addEventListener('click',()=>{ renderForm(); show('form'); });
+$('#refresh').addEventListener('click',renderResults);
+$('#editMine').addEventListener('click',()=>{ renderForm(); show(state.name?'form':'landing'); });
+$('#newAnswer').addEventListener('click',()=>{ resetAnswer(); show('landing'); });
+$('#clearMine').addEventListener('click',async()=>{
+  if(!state.myId){ alert('There is no saved answer to clear on this device yet.'); return; }
+  if(!confirm('Delete your saved answer? This cannot be undone.')) return;
+  try{ await deleteResponse(state.myId); }
+  catch(e){ alert('Could not delete right now. Try again.'); return; }
+  resetAnswer();
+  renderResults();
+});
+
+show('landing');
+</script>
